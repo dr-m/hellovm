@@ -4,8 +4,14 @@ SET(CMAKE_C_STANDARD 99)
 SET(CMAKE_CXX_STANDARD 14)
 
 FIND_PACKAGE(LLVM REQUIRED CONFIG
-  PATHS "/usr/lib/llvm-9/cmake" "/usr/lib/llvm-13/cmake"
-  NO_DEFAULT_PATH)
+  PATHS
+  "/usr/lib/llvm-15/cmake"
+  "/usr/lib/llvm-14/cmake"
+  "/usr/lib/llvm-13/cmake"
+  "/usr/lib/llvm-12/cmake"
+  "/usr/lib/llvm-11/cmake"
+  "/usr/lib/llvm-10/cmake"
+  "/usr/lib/llvm-9/cmake")
 
 MESSAGE(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 MESSAGE(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")

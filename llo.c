@@ -39,10 +39,6 @@ int main(int argc, char **argv)
     return 1;
   }
 
-  LLVMTargetMachineRef TM =
-    LLVMCreateTargetMachine(Target, TargetTriple, "generic", "",
-                            LLVMCodeGenLevelDefault, LLVMRelocPIC,
-                            LLVMCodeModelDefault);
   LLVMSetTarget(M, TargetTriple);
   LLVMDisposeMessage(TargetTriple);
 
@@ -65,7 +61,7 @@ int main(int argc, char **argv)
       greets[1] = LLVMConstString("all\0\0", 6, TRUE);
 
       LLVMTypeRef greetType = LLVMArrayType(LLVMTypeOf(greets[0]), 2);
-      LLVMValueRef GV = LLVMAddGlobal(M, greetType, "msg");
+      LLVMValueRef GV = LLVMAddGlobal(M, greetType, "greetings");
       LLVMSetInitializer(GV, LLVMConstArray(greetType, greets, 2));
       LLVMSetGlobalConstant(GV, TRUE);
       LLVMSetUnnamedAddress(GV, LLVMLocalUnnamedAddr);
@@ -101,75 +97,34 @@ int main(int argc, char **argv)
     /* LLVMDumpModule(M); */
 
     assert(!LLVMVerifyFunction(TheFunction, LLVMPrintMessageAction));
-
-    {
-      LLVMPassManagerRef PM = LLVMCreateFunctionPassManagerForModule(M);
-      LLVMAddPromoteMemoryToRegisterPass(PM);
-      LLVMAddInstructionCombiningPass(PM);
-      LLVMAddReassociatePass(PM);
-      LLVMAddGVNPass(PM);
-      LLVMAddCFGSimplificationPass(PM);
-      LLVMInitializeFunctionPassManager(PM);
-
-      LLVMRunFunctionPassManager(PM, TheFunction);
-      LLVMDisposePassManager(PM);
-    }
   }
 
-  LLVMMemoryBufferRef ObjBuffer;
-  if (LLVMTargetMachineEmitToMemoryBuffer(TM, M, LLVMObjectFile, &errors,
-                                          &ObjBuffer))
+  struct LLVMMCJITCompilerOptions mcjit;
+  LLVMInitializeMCJITCompilerOptions(&mcjit, sizeof mcjit);
+  mcjit.OptLevel = 2;
+  LLVMExecutionEngineRef EE;
+  /* FIXME: There is no way to specify LLVMRelocPIC or LLVMTargetMachineRef */
+  if (LLVMCreateMCJITCompilerForModule(&EE, M, &mcjit, sizeof mcjit, &errors))
     goto fail;
-  LLVMDisposeTargetMachine(TM);
-  LLVMDisposeModule(M);
-  LLVMContextDispose(C);
 
-  const char *elf= LLVMGetBufferStart(ObjBuffer);
-  const size_t elfsize = LLVMGetBufferSize(ObjBuffer);
-  FILE *f = fopen("llo-c.o", "wb");
+  uint64_t f = LLVMGetFunctionAddress(EE, "boo");
+  uint64_t gv = LLVMGetGlobalValueAddress(EE, "greetings");
 
-  if (f) {
-    fwrite(elf, elfsize, 1, f);
-    fclose(f);
+  printf("boo=%llx, greetings=%llx\n", f, gv);
+  assert(gv > f);
+  assert(f);
+
+  FILE *file = fopen("c.bin", "wb");
+  if (file) {
+    fwrite((const void*) f, gv - f + 12, 1, file);
+    fclose(file);
   }
-
-  assert(!memcmp(elf, "ELF", 4));
-  assert(elf[4] == 2); /*64-bit*/
-  assert(elf[6] == 1);
-  assert(*(const uint16_t*) &elf[0x34] == 64);
-#if LLVM_VERSION_MAJOR < 14
-  /* number of sections */
-  assert(*(const uint16_t*) &elf[0x3c] == 7);
-#else
-  /* LLVM 14 and 15 create two .text sections and a .text.rela section
-  for the reference to the global variable */
-  const uint16_t numSections = *(const uint16_t*) &elf[0x3c];
-  assert(numSections == 7 || numSections == 9);
-#endif
-  /* section header size */
-  assert(*(const uint16_t*) &elf[0x3a] == 64);
-  const size_t *sections = (const size_t*)(elf + *(const size_t*) &elf[0x28]);
-  assert(elf + elfsize > (char*)(*sections + 8 * 7));
-  assert(((const uint32_t*) &sections[8 * 2])[1] == 1);
-  char *text = (char*) &elf[sections[8 * 2 + 3]];
-  size_t textsize = sections[8 * 2 + 4];
-#if LLVM_VERSION_MAJOR >= 14
-  if (numSections == 9) {
-    assert(&elf[sections[8 * 4 + 3]] == text + textsize);
-    textsize += sections[8 * 4 + 4];
-    /* TODO: apply .text.rela */
-  }
-#endif
-
-  printf("size: %zu\n", textsize);
-
-  mprotect((void*)((size_t)text & ~((size_t)4095)), (textsize + 4095) & ~4095U,
-           PROT_READ | PROT_WRITE | PROT_EXEC);
 
   typedef int (*callback)(const char*);
   int (*boo) (const char *, callback, unsigned) =
-    ((int (*)(const char *, callback, unsigned)) text);
+    ((int (*)(const char *, callback, unsigned)) f);
   int ret = boo("hello", puts, 0) + boo("goodbye", puts, 1);
-  LLVMDisposeMemoryBuffer(ObjBuffer);
+  LLVMDisposeExecutionEngine(EE);
+  LLVMContextDispose(C);
   return ret;
 }

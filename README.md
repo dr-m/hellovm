@@ -12,11 +12,45 @@ You may also use the following directly:
 cc -o hellovmc llo.c $(llvm-config --cflags --ldflags --system-libs --libs core)
 c++ -o hellovm llo.cc $(llvm-config --cxxflags --ldflags --system-libs --libs core)
 ```
+Note: You may have to replace `llvm-config` with something that
+includes a version number suffix, such as `llvm-config-13`.
+
+When run, the programs will write the generated machine code into a file
+`cc.bin` (for the C++ version) or `c.bin` (for the C version) and then
+attempt to execute the code. Something like this should be written to
+the standard output. The following for `hellovm` on AMD64:
+```
+boo=7f89f01db000, greetings=7f89f01db02a
+hello 
+world
+goodbye 
+all
+```
+On LLVM 14 and 15 due to
+https://github.com/llvm/llvm-project/issues/57274 the `greetings` will
+not be stored right after the end of the function `boo`, but in a
+separate page.
+
+## Library interface notes
+
+`LLVMCreateMCJITCompilerForModule()` in the `llvm-c` library does not
+provide access to all options of the `llvm::EngineBuilder()`. Most notably,
+there does not seem to be a way to specify a relocation model, such as
+position-independent code.
+
+An earlier version of this experiment generated an `.o` file in a
+memory buffer and then parsed that buffer as ELF.
+
+An attempt to use `llvm::RuntimeDyld::loadObject()` was not successful;
+`llvm::RuntimeDyld::LoadedObjectInfo::getSectionLoadAddress()` would
+return something to which relocations were not applied.
 
 ## Platform notes
 
 ### AMD64
-The program is readily linked position-independent code.
+On LLVM 9 to 13, the program is readily linked position-independent code
+straight from the compiler.
+
 On LLVM 14 and 15, there is an issue that a `.text.rela` section for
 the constant will not be replaced, and two `.text` sections will be generated:
 https://github.com/llvm/llvm-project/issues/57274

@@ -13,10 +13,9 @@
 #endif
 #include "llvm/Support/Host.h"
 #include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
 
 #include <sys/mman.h> /* mprotect() */
 
@@ -27,6 +26,16 @@ namespace std { using llvm::make_unique; }
 #if LLVM_VERSION_MAJOR < 10
 namespace llvm { using Align = int; }
 #endif
+
+class NullResolver : public llvm::LegacyJITSymbolResolver
+{
+public:
+  llvm::JITSymbol findSymbol(const std::string &) override { return nullptr; }
+
+  llvm::JITSymbol findSymbolInLogicalDylib(const std::string &) override {
+    return nullptr;
+  }
+};
 
 int main(int argc, char **argv)
 {
@@ -79,7 +88,7 @@ int main(int argc, char **argv)
                                  {world, all});
       auto GV = new llvm::GlobalVariable(*M, greetings->getType(), true,
                                          llvm::GlobalValue::InternalLinkage,
-                                         greetings);
+                                         greetings, "greetings");
       GV->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Local);
       GV->setAlignment(llvm::Align(1));
       GV->setSection(llvm::StringRef{".text", 5});
@@ -98,90 +107,44 @@ int main(int argc, char **argv)
     }
     // M->dump();
     assert(!llvm::verifyFunction(*TheFunction, &llvm::errs()));
-
-    {
-      // Create the analysis managers.
-      llvm::LoopAnalysisManager LAM;
-      llvm::FunctionAnalysisManager FAM;
-      llvm::CGSCCAnalysisManager CGAM;
-      llvm::ModuleAnalysisManager MAM;
-
-      // Create the new pass manager builder.
-      // Take a look at the PassBuilder constructor parameters for more
-      // customization, e.g. specifying a TargetMachine or various debugging
-      // options.
-      llvm::PassBuilder PB;
-
-      // Register all the basic analyses with the managers.
-      PB.registerModuleAnalyses(MAM);
-      PB.registerCGSCCAnalyses(CGAM);
-      PB.registerFunctionAnalyses(FAM);
-      PB.registerLoopAnalyses(LAM);
-      PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-      using OptimizationLevel = llvm::
-#if LLVM_VERSION_MAJOR < 14
-        PassBuilder::
-#endif
-        OptimizationLevel;
-
-      PB.buildPerModuleDefaultPipeline(OptimizationLevel::O2).run(*M, MAM);
-    }
-
-    {
-      llvm::raw_svector_ostream ObjStream(ObjBufferSV);
-
-      llvm::legacy::PassManager PM;
-      llvm::MCContext *Ctx;
-      if (TM->addPassesToEmitMC(PM, Ctx, ObjStream))
-        return 2;
-      PM.run(*M);
-    }
   }
 
-  const char *elf= ObjBufferSV.begin();
-  const size_t elfsize = ObjBufferSV.size();
+  auto EE = llvm::EngineBuilder(std::move(M)).
+    setEngineKind(llvm::EngineKind::JIT).
+    setSymbolResolver(std::make_unique<NullResolver>()).
+    setErrorStr(&Error).
+    setOptLevel(llvm::CodeGenOpt::Default).
+    setRelocationModel(llvm::Reloc::PIC_).
+    setCodeModel(llvm::CodeModel::Tiny).
+    setMCPU("native").
+    setVerifyModules(true).
+    create(TM.release());
 
-  if (FILE *f = fopen("llo.o", "wb")) {
-    fwrite(elf, elfsize, 1, f);
-    fclose(f);
-  }
+  EE->finalizeObject();
 
-  assert(!memcmp(elf, "ELF", 4));
-  assert(elf[4] == 2); /*64-bit*/
-  assert(elf[6] == 1);
-  assert(*reinterpret_cast<const uint16_t*>(elf + 0x34) == 64);
-#if LLVM_VERSION_MAJOR < 14
-  /* number of sections */
-  assert(*reinterpret_cast<const uint16_t*>(elf + 0x3c) == 7);
-#else
-  /* LLVM 14 and 15 create two .text sections and a .text.rela section
-  for the reference to the global variable */
-  const uint16_t numSections = *reinterpret_cast<const uint16_t*>(elf + 0x3c);
-  assert(numSections == 7 || numSections == 9);
-#endif
-  /* section header size */
-  assert(*reinterpret_cast<const uint16_t*>(elf + 0x3a) == 64);
-  const size_t *sections = reinterpret_cast<const size_t*>
-    (elf + *reinterpret_cast<const size_t*>(elf + 0x28));
-  assert(elf + elfsize > reinterpret_cast<const char*>(*sections + 8 * 7));
-  assert(reinterpret_cast<const uint32_t*>(&sections[8 * 2])[1] == 1);
-  char *text = const_cast<char*>(&elf[sections[8 * 2 + 3]]);
-  size_t textsize = sections[8 * 2 + 4];
-#if LLVM_VERSION_MAJOR >= 14
-  if (numSections == 9) {
-    assert(const_cast<char*>(&elf[sections[8 * 4 + 3]]) == text + textsize);
-    textsize += sections[8 * 4 + 4];
-    /* TODO: apply .text.rela */
+#if LLVM_VERSION_MAJOR >= 11
+  if (EE->hasError()) {
+    llvm::errs() << EE->getErrorMessage();
+    return 2;
   }
 #endif
 
-  printf("size: %zu\n", textsize);
+  uint64_t f = EE->getFunctionAddress("boo");
+  uint64_t gv = EE->getGlobalValueAddress("greetings");
 
-  mprotect((void*)((size_t)text & ~size_t{4095}), (textsize + 4095) & ~4095U,
-           PROT_READ | PROT_WRITE | PROT_EXEC);
+  printf("boo=%llx, greetings=%llx\n", f, gv);
+  assert(gv > f);
+  assert(f);
+
+  if (FILE *file = fopen("cc.bin", "wb")) {
+    fwrite((const void*) f, gv - f + 12, 1, file);
+    fclose(file);
+  }
 
   typedef int (*callback)(const char*);
-  auto boo = reinterpret_cast<int(*)(const char *, callback, unsigned)>(text);
-  return boo("hello", puts, 0) + boo("goodbye", puts, 1);
+  auto boo =
+    reinterpret_cast<int(*)(const char *, callback, unsigned)>(f);
+  int ret = boo("hello ", puts, 0) + boo("goodbye ", puts, 1);
+  delete EE;
+  return ret;
 }
