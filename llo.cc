@@ -49,6 +49,7 @@ int main(int argc, char **argv)
   const auto TargetTriple = llvm::sys::getDefaultTargetTriple();
   const auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
   if (!Target) {
+  fail:
     llvm::errs() << Error;
     return 1;
   }
@@ -119,6 +120,9 @@ int main(int argc, char **argv)
     setMCPU("native").
     setVerifyModules(true).
     create(TM.release());
+
+  if (!EE)
+    goto fail;
 
   EE->finalizeObject();
 
