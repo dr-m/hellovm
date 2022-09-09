@@ -136,12 +136,12 @@ int main(int argc, char **argv)
   uint64_t f = EE->getFunctionAddress("boo");
   uint64_t gv = EE->getGlobalValueAddress("greetings");
 
-  printf("boo=%llx, greetings=%llx\n", f, gv);
+  printf("boo=%" PRIx64 ", greetings=%" PRIx64 "\n", f, gv);
   assert(gv > f);
   assert(f);
 
   if (FILE *file = fopen("cc.bin", "wb")) {
-    fwrite((const void*) f, gv - f + 12, 1, file);
+    fwrite(reinterpret_cast<const void*>(f), gv - f + 12, 1, file);
     fclose(file);
   }
 

@@ -110,7 +110,7 @@ int main(int argc, char **argv)
   uint64_t f = LLVMGetFunctionAddress(EE, "boo");
   uint64_t gv = LLVMGetGlobalValueAddress(EE, "greetings");
 
-  printf("boo=%llx, greetings=%llx\n", f, gv);
+  printf("boo=%" PRIx64 ", greetings=%" PRIx64 "\n", f, gv);
   assert(gv > f);
   assert(f);
 
