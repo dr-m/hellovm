@@ -8,6 +8,7 @@
 # include "llvm-c/Analysis.h"
 # include <string.h> /* memcmp() */
 #endif
+#include "mcjit.h"
 
 #include <stdio.h> /* puts(), fopen() */
 
@@ -39,6 +40,10 @@ int main(int argc, char **argv)
     return 1;
   }
 
+  LLVMTargetMachineRef TM =
+    LLVMCreateTargetMachine(Target, TargetTriple, "generic", "",
+                            LLVMCodeGenLevelDefault, LLVMRelocPIC,
+                            LLVMCodeModelDefault);
   LLVMSetTarget(M, TargetTriple);
   LLVMDisposeMessage(TargetTriple);
 
@@ -99,12 +104,9 @@ int main(int argc, char **argv)
     assert(!LLVMVerifyFunction(TheFunction, LLVMPrintMessageAction));
   }
 
-  struct LLVMMCJITCompilerOptions mcjit;
-  LLVMInitializeMCJITCompilerOptions(&mcjit, sizeof mcjit);
-  mcjit.OptLevel = 2;
   LLVMExecutionEngineRef EE;
-  /* FIXME: There is no way to specify LLVMRelocPIC or LLVMTargetMachineRef */
-  if (LLVMCreateMCJITCompilerForModule(&EE, M, &mcjit, sizeof mcjit, &errors))
+
+  if (CreateMCJIT(&EE, TM, M, &errors))
     goto fail;
 
   uint64_t f = LLVMGetFunctionAddress(EE, "boo");

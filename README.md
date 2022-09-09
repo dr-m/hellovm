@@ -3,14 +3,16 @@
 These programs demonstrate how to let generate and invoke stand-alone
 position-independent code using LLVM IR, both the C and C++ interface.
 
-This has been mainly tested with LLVM 9 and LLVM 13.
+This has been tested on various platforms with LLVM 9, 11, 13, 14, 15.
 
-The CMake tooling is optional and incomplete.
-You may also use the following directly:
+The CMake tooling is optional and possibly incomplete.
+You may also invoke the following directly:
 
 ```sh
-cc -o hellovmc llo.c $(llvm-config --cflags --ldflags --system-libs --libs core)
 c++ -o hellovm llo.cc $(llvm-config --cxxflags --ldflags --system-libs --libs core)
+cc -c llo.c $(llvm-config --cflags)
+c++ -c mcjit.cc $(llvm-config --cxxflags)
+c++ -o hellovmc llo.o mcjit.o $(llvm-config --ldflags --system-libs --libs core)
 ```
 Note: You may have to replace `llvm-config` with something that
 includes a version number suffix, such as `llvm-config-13`.
@@ -36,7 +38,8 @@ separate page.
 `LLVMCreateMCJITCompilerForModule()` in the `llvm-c` library does not
 provide access to all options of the `llvm::EngineBuilder()`. Most notably,
 there does not seem to be a way to specify a relocation model, such as
-position-independent code.
+position-independent code. Therefore, we use our own wrapper
+`CreateMCJIT()`.
 
 An earlier version of this experiment generated an `.o` file in a
 memory buffer and then parsed that buffer as ELF.
