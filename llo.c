@@ -22,28 +22,7 @@ int main(int argc, char **argv)
 
   LLVMContextRef C = LLVMContextCreate();
   LLVMModuleRef M = LLVMModuleCreateWithNameInContext("heLLoVM-C", C);
-
-  char *TargetTriple = LLVMGetDefaultTargetTriple();
   char *errors = 0;
-  LLVMTargetRef Target;
-  LLVMGetTargetFromTriple(TargetTriple, &Target, &errors);
-
-  if (!Target) {
-  fail:
-    puts(errors);
-    LLVMDisposeMessage(errors);
-    LLVMDisposeMessage(TargetTriple);
-    LLVMDisposeModule(M);
-    LLVMContextDispose(C);
-    return 1;
-  }
-
-  LLVMTargetMachineRef TM =
-    LLVMCreateTargetMachine(Target, TargetTriple, "generic", "",
-                            LLVMCodeGenLevelDefault, LLVMRelocPIC,
-                            LLVMCodeModelDefault);
-  LLVMSetTarget(M, TargetTriple);
-  LLVMDisposeMessage(TargetTriple);
 
   {
     LLVMTypeRef stringType = LLVMPointerType(LLVMInt8TypeInContext(C), 0);
@@ -104,8 +83,13 @@ int main(int argc, char **argv)
 
   LLVMExecutionEngineRef EE;
 
-  if (CreateMCJIT(&EE, TM, M, &errors))
-    goto fail;
+  if (CreateMCJIT(&EE, M, &errors)) {
+    puts(errors);
+    LLVMDisposeMessage(errors);
+    LLVMDisposeModule(M);
+    LLVMContextDispose(C);
+    return 1;
+  }
 
   uint64_t f = LLVMGetFunctionAddress(EE, "boo");
   uint64_t gv = LLVMGetGlobalValueAddress(EE, "greetings");

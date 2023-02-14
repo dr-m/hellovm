@@ -1,12 +1,7 @@
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 
-namespace llvm {
-  static TargetMachine *unwrap(LLVMTargetMachineRef TM)
-  { return reinterpret_cast<TargetMachine *>(TM); }
-}
-
 extern "C"
-LLVMBool CreateMCJIT(LLVMExecutionEngineRef *OutJIT, LLVMTargetMachineRef TM,
+LLVMBool CreateMCJIT(LLVMExecutionEngineRef *OutJIT,
                      LLVMModuleRef M, char **OutError)
 {
   std::string Error;
@@ -16,9 +11,7 @@ LLVMBool CreateMCJIT(LLVMExecutionEngineRef *OutJIT, LLVMTargetMachineRef TM,
       setErrorStr(&Error).
       setOptLevel(llvm::CodeGenOpt::Default).
       setRelocationModel(llvm::Reloc::PIC_).
-      setCodeModel(llvm::CodeModel::Tiny).
-      setMCPU("native").
-      create(llvm::unwrap(TM))) {
+      create()) {
     EE->finalizeObject();
     *OutJIT = llvm::wrap(EE);
     return 0;

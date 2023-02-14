@@ -6,15 +6,8 @@
 #ifndef NDEBUG
 # include "llvm/IR/Verifier.h"
 #endif
-#if LLVM_VERSION_MAJOR >= 14
-# include "llvm/MC/TargetRegistry.h"
-#else
-# include "llvm/Support/TargetRegistry.h"
-#endif
 #include "llvm/Support/Host.h"
 #include "llvm/Support/TargetSelect.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetOptions.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 
 #if defined __GNUC__ && !defined __clang__ && __GNUC__ == 4
@@ -42,25 +35,6 @@ int main(int argc, char **argv)
 
   auto C = std::make_unique<llvm::LLVMContext>();
   auto M = std::make_unique<llvm::Module>("heLLoVM", *C);
-
-  std::string Error;
-  const auto TargetTriple = llvm::sys::getDefaultTargetTriple();
-  const auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
-  if (!Target) {
-  fail:
-    llvm::errs() << Error;
-    return 1;
-  }
-
-  llvm::TargetOptions opt;
-  std::unique_ptr<llvm::TargetMachine>
-    TM(Target->createTargetMachine(TargetTriple, "generic", "", opt,
-                                   llvm::Optional<llvm::Reloc::Model>
-                                   (llvm::Reloc::PIC_)));
-  M->setDataLayout(TM->createDataLayout());
-  M->setTargetTriple(TargetTriple);
-
-  llvm::SmallVector<char, 0> ObjBufferSV;
 
   {
     const auto stringType = llvm::Type::getInt8PtrTy(*C);
@@ -108,19 +82,20 @@ int main(int argc, char **argv)
     assert(!llvm::verifyFunction(*TheFunction, &llvm::errs()));
   }
 
+  std::string Error;
   auto EE = llvm::EngineBuilder(std::move(M)).
     setEngineKind(llvm::EngineKind::JIT).
     setSymbolResolver(std::make_unique<NullResolver>()).
     setErrorStr(&Error).
     setOptLevel(llvm::CodeGenOpt::Default).
     setRelocationModel(llvm::Reloc::PIC_).
-    setCodeModel(llvm::CodeModel::Tiny).
-    setMCPU("native").
     setVerifyModules(true).
-    create(TM.release());
+    create();
 
-  if (!EE)
-    goto fail;
+  if (!EE) {
+    llvm::errs() << Error;
+    return 1;
+  }
 
   EE->finalizeObject();
 
