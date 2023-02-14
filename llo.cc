@@ -129,6 +129,7 @@ int main(int argc, char **argv)
 #if LLVM_VERSION_MAJOR >= 11
   if (EE->hasError()) {
     llvm::errs() << EE->getErrorMessage();
+    delete EE;
     return 2;
   }
 #endif
