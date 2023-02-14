@@ -12,8 +12,6 @@
 
 #include <stdio.h> /* puts(), fopen() */
 
-#include <sys/mman.h> /* mprotect() */
-
 #define FALSE 0
 #define TRUE 1
 

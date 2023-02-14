@@ -17,8 +17,6 @@
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 
-#include <sys/mman.h> /* mprotect() */
-
 #if defined __GNUC__ && !defined __clang__ && __GNUC__ == 4
 namespace std { using llvm::make_unique; }
 #endif
