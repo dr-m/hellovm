@@ -1,15 +1,20 @@
 # heLLoVM: a simple "hello world" using LLVM IR
 
 These programs demonstrate how to let generate and invoke stand-alone
-position-independent code using LLVM IR, both the C and C++ interface.
+position-independent code using LLVM IR, both C and C++ interfaces.
 
-This has been tested on various platforms with LLVM 9, 11, 13, 14, 15.
+The MCJIT interface has been tested on various platforms with
+LLVM 9, 11, 13, 14, 15.
+
+The ORCv2 interface is work in progress and has so far been tested
+on LLVM 11, 13, 14, 15.
 
 The CMake tooling is optional and possibly incomplete.
 You may also invoke the following directly:
 
 ```sh
 c++ -o hellovm llo.cc $(llvm-config --cxxflags --ldflags --system-libs --libs core)
+c++ -o hellorc llo-orc.cc $(llvm-config --cxxflags --ldflags --system-libs --libs core)
 cc -c llo.c $(llvm-config --cflags)
 c++ -c mcjit.cc $(llvm-config --cxxflags)
 c++ -o hellovmc llo.o mcjit.o $(llvm-config --ldflags --system-libs --libs core)
