@@ -6,8 +6,8 @@ position-independent code using LLVM IR, both C and C++ interfaces.
 The MCJIT interface has been tested on various platforms with
 LLVM 9, 11, 13, 14, 15.
 
-The ORCv2 interface has been tested on LLVM 13, 14, 15.
-When built with LLVM 13, it will leak memory, because
+The ORCv2 interface has been tested with LLVM 13, 14, 15.
+When built with LLVM 13, the C++ version will leak memory, because
 `llvm::orc::ExecutionSession::removeJITDylib()` is not available there.
 
 The CMake tooling is optional and possibly incomplete.
@@ -15,10 +15,12 @@ You may also invoke the following directly:
 
 ```sh
 c++ -o hellovm llo.cc $(llvm-config --cxxflags --ldflags --system-libs --libs core)
-c++ -o hellorc llo-orc.cc $(llvm-config --cxxflags --ldflags --system-libs --libs core)
 cc -c llo.c $(llvm-config --cflags)
 c++ -c mcjit.cc $(llvm-config --cxxflags)
 c++ -o hellovmc llo.o mcjit.o $(llvm-config --ldflags --system-libs --libs core)
+# For LLVM-13 or later:
+c++ -o hellorc llo-orc.cc $(llvm-config --cxxflags --ldflags --system-libs --libs core)
+cc -o hellorcc llo-orc.c $(llvm-config --cflags --ldflags --system-libs --libs core)
 ```
 Note: You may have to replace `llvm-config` with something that
 includes a version number suffix, such as `llvm-config-13`,
@@ -27,7 +29,7 @@ and `cc` and `c++` with the names of your preferred C and C++ compilers.
 When run, the programs will write the generated machine code into a file
 `cc.bin` (for the C++ `hellovm`) or `c.bin` (for the C `hellovmc`) and then
 attempt to execute the code. Something like this should be written to
-the standard output. The following for `hellovm` on AMD64:
+the standard output. The following is for `hellovm` on AMD64:
 ```
 boo=7f89f01db000, greetings=7f89f01db02a
 hello 

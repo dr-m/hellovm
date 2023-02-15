@@ -42,14 +42,9 @@ int main(int argc, char **argv)
     llvm::errs() << DL.takeError();
     return 1;
   }
-  llvm::orc::RTDyldObjectLinkingLayer ObjectLayer
-    {*ES, []() { return std::make_unique<llvm::SectionMemoryManager>(); }};
-  llvm::orc::IRCompileLayer CompileLayer
-    {*ES, ObjectLayer,
-     std::make_unique<llvm::orc::ConcurrentIRCompiler>(std::move(JTMB))};
 
-  llvm::orc::JITDylib &MainJD = ES->createBareJITDylib("<main>");
-  MainJD.addGenerator
+  llvm::orc::JITDylib &JD = ES->createBareJITDylib("<main>");
+  JD.addGenerator
     (cantFail(llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess
               (DL->getGlobalPrefix())));
 
@@ -105,22 +100,28 @@ int main(int argc, char **argv)
     assert(!llvm::verifyFunction(*TheFunction, &llvm::errs()));
   }
 
+  llvm::orc::RTDyldObjectLinkingLayer ObjectLayer
+    {*ES, []() { return std::make_unique<llvm::SectionMemoryManager>(); }};
+  llvm::orc::IRCompileLayer CompileLayer
+    {*ES, ObjectLayer,
+     std::make_unique<llvm::orc::ConcurrentIRCompiler>(std::move(JTMB))};
+
   if (llvm::Error Err
       {CompileLayer.add
-       (MainJD.getDefaultResourceTracker(),
+       (JD.getDefaultResourceTracker(),
         llvm::orc::ThreadSafeModule(std::move(M), std::move(C)))}) {
     llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
     return 1;
   }
 
   llvm::Expected<llvm::JITEvaluatedSymbol> booSym
-    {ES->lookup({&MainJD}, (*Mangle)("boo"))};
+    {ES->lookup({&JD}, (*Mangle)("boo"))};
   if (!booSym) {
     llvm::errs() << booSym.takeError() << '\n';
     return 1;
   }
   llvm::Expected<llvm::JITEvaluatedSymbol> greetingsSym
-    {ES->lookup({&MainJD}, (*Mangle)("greetings"))};
+    {ES->lookup({&JD}, (*Mangle)("greetings"))};
   if (!greetingsSym) {
     llvm::errs() << greetingsSym.takeError() << '\n';
     return 1;
@@ -146,7 +147,7 @@ int main(int argc, char **argv)
     reinterpret_cast<int(*)(const char *, callback, unsigned)>(f);
   int ret = boo("hello ", puts, 0) + boo("goodbye ", puts, 1);
 #if LLVM_VERSION_MAJOR >= 14
-  if (llvm::Error Err{ES->removeJITDylib(MainJD)}) {
+  if (llvm::Error Err{ES->removeJITDylib(JD)}) {
     llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
     return 1;
   }
