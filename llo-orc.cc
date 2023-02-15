@@ -22,10 +22,6 @@
 namespace std { using llvm::make_unique; }
 #endif
 
-#if LLVM_VERSION_MAJOR < 10
-namespace llvm { using Align = int; }
-#endif
-
 int main(int argc, char **argv)
 {
   llvm::InitializeNativeTarget();
@@ -135,7 +131,7 @@ int main(int argc, char **argv)
 
   printf("boo=%" PRIx64 ", greetings=%" PRIx64 "\n", f, gv);
 #if 0 // TODO: How to determine the length of the code?
-  // For some reason, ORCv2 on LLVM later than LLVM 13 may emits
+  // For some reason, ORCv2 on LLVM later than LLVM 13 may emit
   // "greetings" before "boo" while MCJIT always seems to follow the
   // same order.
   assert(f < gv);

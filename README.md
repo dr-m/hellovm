@@ -6,8 +6,9 @@ position-independent code using LLVM IR, both C and C++ interfaces.
 The MCJIT interface has been tested on various platforms with
 LLVM 9, 11, 13, 14, 15.
 
-The ORCv2 interface is work in progress and has so far been tested
-on LLVM 11, 13, 14, 15.
+The ORCv2 interface has been tested on LLVM 13, 14, 15.
+When built with LLVM 13, it will leak memory, because
+`llvm::orc::ExecutionSession::removeJITDylib()` is not available there.
 
 The CMake tooling is optional and possibly incomplete.
 You may also invoke the following directly:
@@ -20,10 +21,11 @@ c++ -c mcjit.cc $(llvm-config --cxxflags)
 c++ -o hellovmc llo.o mcjit.o $(llvm-config --ldflags --system-libs --libs core)
 ```
 Note: You may have to replace `llvm-config` with something that
-includes a version number suffix, such as `llvm-config-13`.
+includes a version number suffix, such as `llvm-config-13`,
+and `cc` and `c++` with the names of your preferred C and C++ compilers.
 
 When run, the programs will write the generated machine code into a file
-`cc.bin` (for the C++ version) or `c.bin` (for the C version) and then
+`cc.bin` (for the C++ `hellovm`) or `c.bin` (for the C `hellovmc`) and then
 attempt to execute the code. Something like this should be written to
 the standard output. The following for `hellovm` on AMD64:
 ```
