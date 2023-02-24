@@ -8,6 +8,7 @@
 #ifndef NDEBUG
 # include "llvm-c/Analysis.h"
 #endif
+#include "orc.h"
 
 #include <stdio.h> /* puts(), fopen() */
 
@@ -40,13 +41,9 @@ int main(int argc, char **argv)
       goto err_exit;
   }
 
-#if 0 // FIXME: What should replace LLVMOrcLLJITLookup()?
   LLVMOrcExecutionSessionRef ES = LLVMOrcLLJITGetExecutionSession(Jit);
   LLVMOrcJITDylibRef JD =
     LLVMOrcExecutionSessionCreateBareJITDylib(ES, "<main>");
-#else
-  LLVMOrcJITDylibRef JD = LLVMOrcLLJITGetMainJITDylib(Jit);
-#endif
   LLVMOrcDefinitionGeneratorRef DG;
 
   if ((Err = LLVMOrcCreateDynamicLibrarySearchGeneratorForProcess
@@ -122,8 +119,8 @@ int main(int argc, char **argv)
     goto err_exit;
 
   LLVMOrcJITTargetAddress booAddr, greetingsAddr;
-  if ((Err = LLVMOrcLLJITLookup(Jit, &booAddr, "boo")) ||
-      (Err = LLVMOrcLLJITLookup(Jit, &greetingsAddr, "greetings")))
+  if ((Err = LLVM_Lookup(Jit, JD, &booAddr, "boo")) ||
+      (Err = LLVM_Lookup(Jit, JD, &greetingsAddr, "greetings")))
     goto err_exit;
 
   printf("boo=%" PRIx64 ", greetings=%" PRIx64 "\n", booAddr, greetingsAddr);

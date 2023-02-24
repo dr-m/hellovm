@@ -20,7 +20,9 @@ c++ -c mcjit.cc $(llvm-config --cxxflags)
 c++ -o hellovmc llo.o mcjit.o $(llvm-config --ldflags --system-libs --libs core)
 # For LLVM-13 or later:
 c++ -o hellorc llo-orc.cc $(llvm-config --cxxflags --ldflags --system-libs --libs core)
-cc -o hellorcc llo-orc.c $(llvm-config --cflags --ldflags --system-libs --libs core)
+cc -c llo-orc.c $(llvm-config --cflags)
+c++ -c orc.cc $(llvm-config --cxxflags)
+c++ -o hellorcc llo-orc.o orc.o $(llvm-config --ldflags --system-libs --libs core)
 ```
 Note: You may have to replace `llvm-config` with something that
 includes a version number suffix, such as `llvm-config-13`,
