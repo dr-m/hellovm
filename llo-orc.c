@@ -11,6 +11,7 @@
 #include "orc.h"
 
 #include <stdio.h> /* puts(), fopen() */
+#include <stdlib.h> /* atoi() */
 
 #define FALSE 0
 #define TRUE 1
@@ -21,12 +22,14 @@ int main(int argc, char **argv)
   LLVMInitializeNativeAsmPrinter();
 
   LLVMOrcLLJITRef Jit = NULL;
+  LLVMOrcThreadSafeContextRef TSC = NULL;
   LLVMErrorRef Err;
 
   LLVMOrcJITTargetMachineBuilderRef JTMB;
   {
     if ((Err = LLVMOrcJITTargetMachineBuilderDetectHost(&JTMB))) {
     err_exit:
+      LLVMOrcDisposeThreadSafeContext(TSC);
       LLVMOrcDisposeLLJIT(Jit);
       char *ErrMsg = LLVMGetErrorMessage(Err);
       fprintf(stderr, "Error: %s\n", ErrMsg);
@@ -42,6 +45,11 @@ int main(int argc, char **argv)
   }
 
   LLVMOrcExecutionSessionRef ES = LLVMOrcLLJITGetExecutionSession(Jit);
+  TSC = LLVMOrcCreateNewThreadSafeContext();
+
+  int count = argc > 1 ? atoi(argv[1]) : 1;
+
+loop:
   LLVMOrcJITDylibRef JD =
     LLVMOrcExecutionSessionCreateBareJITDylib(ES, "<main>");
   LLVMOrcDefinitionGeneratorRef DG;
@@ -54,7 +62,6 @@ int main(int argc, char **argv)
   LLVMOrcThreadSafeModuleRef TSM;
 
   {
-    LLVMOrcThreadSafeContextRef TSC = LLVMOrcCreateNewThreadSafeContext();
     LLVMContextRef C = LLVMOrcThreadSafeContextGetContext(TSC);
     LLVMModuleRef M = LLVMModuleCreateWithNameInContext("heLLoVM-C", C);
     LLVMTypeRef stringType = LLVMPointerType(LLVMInt8TypeInContext(C), 0);
@@ -112,7 +119,6 @@ int main(int argc, char **argv)
 
     assert(!LLVMVerifyFunction(TheFunction, LLVMPrintMessageAction));
     TSM = LLVMOrcCreateNewThreadSafeModule(M, TSC);
-    LLVMOrcDisposeThreadSafeContext(TSC);
   }
 
   if ((Err = LLVMOrcLLJITAddLLVMIRModule(Jit, JD, TSM)))
@@ -142,7 +148,13 @@ int main(int argc, char **argv)
   int (*boo) (const char *, callback, unsigned) =
     ((int (*)(const char *, callback, unsigned)) booAddr);
   int ret = boo("hello", puts, 0) + boo("goodbye", puts, 1);
+#if LLVM_VERSION_MAJOR >= 14
+  LLVM_Remove(ES, JD);
+#endif
 
+  if (--count > 0)
+    goto loop;
+  LLVMOrcDisposeThreadSafeContext(TSC);
   LLVMOrcDisposeLLJIT(Jit);
   return ret;
 }

@@ -42,17 +42,26 @@ int main(int argc, char **argv)
     llvm::errs() << DL.takeError();
     return 1;
   }
+  const char GP = DL->getGlobalPrefix();
 
+  std::unique_ptr<llvm::orc::MangleAndInterner> Mangle
+    {std::make_unique<llvm::orc::MangleAndInterner>(*ES, std::move(*DL))};
+  llvm::orc::RTDyldObjectLinkingLayer ObjectLayer
+    {*ES, []() { return std::make_unique<llvm::SectionMemoryManager>(); }};
+  llvm::orc::IRCompileLayer CompileLayer
+    {*ES, ObjectLayer,
+     std::make_unique<llvm::orc::ConcurrentIRCompiler>(std::move(JTMB))};
+
+  int count = argc > 1 ? atoi(argv[1]) : 1;
+
+loop:
   llvm::orc::JITDylib &JD = ES->createBareJITDylib("<main>");
   JD.addGenerator
     (cantFail(llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess
-              (DL->getGlobalPrefix())));
+              (GP)));
 
   auto C = std::make_unique<llvm::LLVMContext>();
   auto M = std::make_unique<llvm::Module>("heLLoVM", *C);
-  M->setDataLayout(*DL);
-  std::unique_ptr<llvm::orc::MangleAndInterner> Mangle
-    {std::make_unique<llvm::orc::MangleAndInterner>(*ES, std::move(*DL))};
 
   {
     const auto stringType = llvm::Type::getInt8PtrTy(*C);
@@ -100,12 +109,6 @@ int main(int argc, char **argv)
     assert(!llvm::verifyFunction(*TheFunction, &llvm::errs()));
   }
 
-  llvm::orc::RTDyldObjectLinkingLayer ObjectLayer
-    {*ES, []() { return std::make_unique<llvm::SectionMemoryManager>(); }};
-  llvm::orc::IRCompileLayer CompileLayer
-    {*ES, ObjectLayer,
-     std::make_unique<llvm::orc::ConcurrentIRCompiler>(std::move(JTMB))};
-
   if (llvm::Error Err
       {CompileLayer.add
        (JD.getDefaultResourceTracker(),
@@ -152,5 +155,7 @@ int main(int argc, char **argv)
     return 1;
   }
 #endif
+  if (--count > 0)
+    goto loop;
   return ret;
 }

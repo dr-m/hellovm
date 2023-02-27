@@ -59,6 +59,27 @@ An attempt to use `llvm::RuntimeDyld::loadObject()` was not successful;
 `llvm::RuntimeDyld::LoadedObjectInfo::getSectionLoadAddress()` would
 return something to which relocations were not applied.
 
+Our ORCv2 interface depends on
+`llvm::orc::SelfExecutorProcessControl::Create()`, which was
+introduced in LLVM 13. The programs `hellorc` and `hellorcc` take an
+optional parameter, to specify the number of loop iterations. You can
+execute
+```sh
+time ./hellorc 10000000 > /dev/null &
+time ./hellorcc 10000000 > /dev/null &
+top
+```
+and monitor the memory usage and consumed CPU time. When using LLVM 14
+or LLVM 15, the memory usage should remain constant. When using LLVM 13,
+the memory usage will keep growing; see below.
+
+Our ORCv2 interface would invoke
+`llvm::orc::ExecutionSession::removeJITDylib()` to remove generated
+dynamic libraries, but that function does not exist in LLVM 13.
+Therefore, `hellorc` will report a memory leak when built with
+`-fsanitize=address`. The C program `hellorcc` will avoid the leak,
+apparently thanks to `LLVMOrcDisposeLLJIT()`.
+
 ## Platform notes
 
 ### AMD64
