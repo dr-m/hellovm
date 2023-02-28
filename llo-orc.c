@@ -49,16 +49,19 @@ int main(int argc, char **argv)
 loop:
   LLVMOrcJITDylibRef JD = LLVMOrcExecutionSessionCreateBareJITDylib
     (LLVMOrcLLJITGetExecutionSession(Jit), "<main>");
-  LLVMOrcDefinitionGeneratorRef DG;
-
-  if ((Err = LLVMOrcCreateDynamicLibrarySearchGeneratorForProcess
-       (&DG, LLVMOrcLLJITGetGlobalPrefix(Jit), NULL, NULL)))
-    goto err_exit;
-
-  LLVMOrcJITDylibAddGenerator(JD, DG);
-  LLVMOrcThreadSafeModuleRef TSM;
 
   {
+    LLVMOrcDefinitionGeneratorRef DG;
+
+    if ((Err = LLVMOrcCreateDynamicLibrarySearchGeneratorForProcess
+         (&DG, LLVMOrcLLJITGetGlobalPrefix(Jit), NULL, NULL)))
+      goto err_exit;
+
+    LLVMOrcJITDylibAddGenerator(JD, DG);
+  }
+
+  {
+    LLVMOrcThreadSafeModuleRef TSM;
     LLVMContextRef C = LLVMOrcThreadSafeContextGetContext(TSC);
     LLVMModuleRef M = LLVMModuleCreateWithNameInContext("heLLoVM-C", C);
     LLVMTypeRef stringType = LLVMPointerType(LLVMInt8TypeInContext(C), 0);
@@ -116,10 +119,9 @@ loop:
 
     assert(!LLVMVerifyFunction(TheFunction, LLVMPrintMessageAction));
     TSM = LLVMOrcCreateNewThreadSafeModule(M, TSC);
+    if ((Err = LLVMOrcLLJITAddLLVMIRModule(Jit, JD, TSM)))
+      goto err_exit;
   }
-
-  if ((Err = LLVMOrcLLJITAddLLVMIRModule(Jit, JD, TSM)))
-    goto err_exit;
 
   LLVMOrcJITTargetAddress booAddr, greetingsAddr;
   if ((Err = LLVM_Lookup(Jit, JD, &booAddr, "boo")) ||
