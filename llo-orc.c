@@ -22,7 +22,7 @@ int main(int argc, char **argv)
   LLVMInitializeNativeAsmPrinter();
 
   LLVMOrcLLJITRef Jit = NULL;
-  LLVMOrcThreadSafeContextRef TSC = NULL;
+  LLVMOrcThreadSafeContextRef TSC = LLVMOrcCreateNewThreadSafeContext();
   LLVMErrorRef Err;
 
   LLVMOrcJITTargetMachineBuilderRef JTMB;
@@ -44,14 +44,11 @@ int main(int argc, char **argv)
       goto err_exit;
   }
 
-  LLVMOrcExecutionSessionRef ES = LLVMOrcLLJITGetExecutionSession(Jit);
-  TSC = LLVMOrcCreateNewThreadSafeContext();
-
   int count = argc > 1 ? atoi(argv[1]) : 1;
 
 loop:
-  LLVMOrcJITDylibRef JD =
-    LLVMOrcExecutionSessionCreateBareJITDylib(ES, "<main>");
+  LLVMOrcJITDylibRef JD = LLVMOrcExecutionSessionCreateBareJITDylib
+    (LLVMOrcLLJITGetExecutionSession(Jit), "<main>");
   LLVMOrcDefinitionGeneratorRef DG;
 
   if ((Err = LLVMOrcCreateDynamicLibrarySearchGeneratorForProcess
@@ -149,7 +146,7 @@ loop:
     ((int (*)(const char *, callback, unsigned)) booAddr);
   int ret = boo("hello", puts, 0) + boo("goodbye", puts, 1);
 #if LLVM_VERSION_MAJOR >= 14
-  LLVM_Remove(ES, JD);
+  LLVM_Remove(LLVMOrcLLJITGetExecutionSession(Jit), JD);
 #endif
 
   if (--count > 0)
