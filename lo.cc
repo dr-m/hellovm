@@ -127,7 +127,7 @@ int main(int argc, char **argv)
   const char *elf= ObjBufferSV.begin();
   const size_t elfsize = ObjBufferSV.size();
 
-  if (FILE *f = fopen("llo.o", "wb")) {
+  if (FILE *f = fopen("lo.o", "wb")) {
     fwrite(elf, elfsize, 1, f);
     fclose(f);
   }

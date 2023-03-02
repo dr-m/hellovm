@@ -51,15 +51,41 @@ separate page.
 ## helfovm, helfovmc
 
 When run, the programs will write the generated object code into a file
-`lo-cc.o` (for the C++ `helfovm`) or `lo-c.o` (for the C `helfovmc`) and then
+`lo.o` (for the C++ `helfovm`) or `lo-c.o` (for the C `helfovmc`) and then
 attempt to execute the code. Something like this should be written to
-the standard output. The following is for AMD64:
+the standard output. The following is for LLVM 15 on AMD64:
 ```
 size: 26
 hello
 world
 goodbye
 all
+```
+You can also disassemble the output:
+```sh
+objdump -d lo-c.o
+```
+The following is with LLVM 14 on ARMv8:
+```
+
+lo-c.o:     file format elf64-littleaarch64
+
+
+Disassembly of section .text:
+
+0000000000000000 <boo>:
+   0:	a9be57fe 	stp	x30, x21, [sp, #-32]!
+   4:	a9014ff4 	stp	x20, x19, [sp, #16]
+   8:	aa0203f3 	mov	x19, x2
+   c:	aa0103f4 	mov	x20, x1
+  10:	d63f0020 	blr	x1
+  14:	2a0003f5 	mov	w21, w0
+  18:	aa1303e0 	mov	x0, x19
+  1c:	d63f0280 	blr	x20
+  20:	a9414ff4 	ldp	x20, x19, [sp, #16]
+  24:	0b150000 	add	w0, w0, w21
+  28:	a8c257fe 	ldp	x30, x21, [sp], #32
+  2c:	d65f03c0 	ret
 ```
 These programs demonstrate that invoking a linker is not necessary when
 compiling a self-contained function as position-independent code.
