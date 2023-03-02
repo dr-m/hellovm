@@ -14,6 +14,8 @@ The CMake tooling is optional and possibly incomplete.
 You may also invoke the following directly:
 
 ```sh
+c++ -o helfovm lo.cc $(llvm-config --cxxflags --ldflags --system-libs --libs core)
+cc -o helfomvc lo.c $(llvm-config --cflags --ldflags --system-libs --libs core)
 c++ -o hellovm llo.cc $(llvm-config --cxxflags --ldflags --system-libs --libs core)
 cc -c llo.c $(llvm-config --cflags)
 c++ -c mcjit.cc $(llvm-config --cxxflags)
@@ -27,6 +29,8 @@ c++ -o hellorcc llo-orc.o orc.o $(llvm-config --ldflags --system-libs --libs cor
 Note: You may have to replace `llvm-config` with something that
 includes a version number suffix, such as `llvm-config-13`,
 and `cc` and `c++` with the names of your preferred C and C++ compilers.
+
+## hellovm, hellovmc
 
 When run, the programs will write the generated machine code into a file
 `cc.bin` (for the C++ `hellovm`) or `c.bin` (for the C `hellovmc`) and then
@@ -43,6 +47,24 @@ On LLVM 14 and 15 due to
 https://github.com/llvm/llvm-project/issues/57274 the `greetings` will
 not be stored right after the end of the function `boo`, but in a
 separate page.
+
+## helfovm, helfovmc
+
+When run, the programs will write the generated object code into a file
+`lo-cc.o` (for the C++ `helfovm`) or `lo-c.o` (for the C `helfovmc`) and then
+attempt to execute the code. Something like this should be written to
+the standard output. The following is for AMD64:
+```
+size: 26
+hello
+world
+goodbye
+all
+```
+These programs demonstrate that invoking a linker is not necessary when
+compiling a self-contained function as position-independent code.
+Any interface to the caller is via function parameters, which could
+include a pointers to global symbols.
 
 ## Library interface notes
 
