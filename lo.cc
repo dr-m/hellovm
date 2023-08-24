@@ -70,6 +70,7 @@ int main(int argc, char **argv)
     llvm::Function *TheFunction =
       llvm::Function::Create(FT, llvm::Function::ExternalLinkage,
                              "boo", M.get());
+    TheFunction->setDoesNotThrow();
     {
       llvm::IRBuilder<> builder(llvm::BasicBlock::Create(*C, "entry",
                                                          TheFunction));
@@ -136,8 +137,8 @@ int main(int argc, char **argv)
   assert(elf[6] == 1);
   assert(*reinterpret_cast<const uint16_t*>(elf + 0x34) == 64);
   /* number of sections */
-  assert(*reinterpret_cast<const uint16_t*>(elf + 0x3c) == 7 ||
-         *reinterpret_cast<const uint16_t*>(elf + 0x3c) == 8/* POWER */);
+  assert(*reinterpret_cast<const uint16_t*>(elf + 0x3c) == 5 ||
+         *reinterpret_cast<const uint16_t*>(elf + 0x3c) == 6/* POWER */);
   /* section header size */
   assert(*reinterpret_cast<const uint16_t*>(elf + 0x3a) == 64);
   const size_t *sections = reinterpret_cast<const size_t*>

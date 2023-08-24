@@ -94,6 +94,11 @@ include a pointers to global symbols.
 
 ## Library interface notes
 
+Attempts to suppress the creation of `.eh_frame` and `.rela.eh_frame`
+by invoking something like
+`LLVMAddTargetDependentFunctionAttr(TheFunction, "nounwind", "");`
+in the `llvm-c` library were unsuccessful.
+
 `LLVMCreateMCJITCompilerForModule()` in the `llvm-c` library does not
 provide access to all options of the `llvm::EngineBuilder()`. Most notably,
 there does not seem to be a way to specify a relocation model, such as
@@ -134,7 +139,7 @@ apparently thanks to `LLVMOrcDisposeLLJIT()`.
 On LLVM 9 to 13, the program is readily linked position-independent code
 straight from the compiler.
 
-On LLVM 14 and 15, there is an issue that a `.text.rela` section for
+On LLVM 14 and 15, there is an issue that a `.rela.text` section for
 the constant will not be replaced, and two `.text` sections will be generated:
 https://github.com/llvm/llvm-project/issues/57274
 

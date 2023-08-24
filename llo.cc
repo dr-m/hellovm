@@ -49,6 +49,8 @@ int main(int argc, char **argv)
     llvm::Function *TheFunction =
       llvm::Function::Create(FT, llvm::Function::ExternalLinkage,
                              "boo", M.get());
+    TheFunction->setDoesNotThrow();
+
     {
       const auto world =
         llvm::ConstantDataArray::getString(*C, llvm::StringRef{"world", 6},
